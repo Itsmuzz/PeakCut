@@ -1,31 +1,23 @@
 # PeakCut Android
 
-This directory is the native Android application workstream for the `android-apk` branch.
+## First native milestone
 
-## Goal
+A native Android application is now scaffolded for the `android-apk` branch.
 
-Ship an installable Android APK that runs its processing locally inside the app. Users should not need Termux or a separately hosted backend.
+The initial vertical slice is local video trimming:
+- Pick a video through Android's system document picker.
+- Preview the selected source.
+- Set start and end times in seconds.
+- Export an MP4 clip into `Movies/PeakCut` using Android MediaExtractor and MediaMuxer.
 
-## Current status
+## Build
 
-This is a porting plan, not a finished app or APK. The existing project is a Python/FastAPI application and cannot be made into a reliable Android APK by simply wrapping its web UI.
+Open this `android/` folder in Android Studio, or run `gradle :app:assembleDebug` with JDK 17 and Android SDK 35 installed.
 
-## Required implementation
+The debug APK output is `app/build/outputs/apk/debug/app-debug.apk`.
 
-1. Native Android shell and app lifecycle.
-2. Local media import/export using Android Storage Access Framework.
-3. Android-compatible FFmpeg integration for cutting, rendering, and audio extraction.
-4. Sherpa-ONNX Android API integration for on-device speech recognition.
-5. Replace Python subprocess and desktop-only file assumptions with Android services.
-6. Port or replace backend features and dependencies that are not Android-compatible.
-7. Add foreground-service handling for long-running jobs and clear storage/model download controls.
-8. Build and test on ARM64 Android devices.
+A GitHub Actions workflow builds the debug APK on pushes to this branch and uploads it as an artifact.
 
-## Milestones
+## Not yet implemented
 
-- M1: Android project builds and installs; app opens.
-- M2: Import a local video, cut a selected segment, and export it.
-- M3: On-device transcription and captions.
-- M4: Complete PeakCut workflows, including live-source handling where technically and legally supported.
-
-A milestone must be tested before it is marked complete. No APK is produced by this documentation commit.
+This is not full PeakCut feature parity. Speech recognition/captions, AI highlight detection, live stream ingestion, creator accounts, and social publishing still need Android-native implementations and device testing. The current clipper is an initial proof-of-concept and must be validated against different codecs, rotation metadata, audio/video sync, and long files before release.
