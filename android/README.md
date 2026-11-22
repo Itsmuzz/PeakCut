@@ -1,23 +1,21 @@
 # PeakCut Android
 
-## First native milestone
+## Native foundation
 
-A native Android application is now scaffolded for the `android-apk` branch.
+- Android video picker and preview.
+- Start/end-time MP4 clip export using MediaExtractor and MediaMuxer.
+- Sherpa-ONNX Android runtime, restricted to arm64-v8a and x86_64.
+- Multilingual Whisper tiny model downloader and app-private model storage.
+- Hindi-default ASR service accepting mono Float32 PCM at 16 kHz and returning transcript text plus token timestamps.
 
-The initial vertical slice is local video trimming:
-- Pick a video through Android's system document picker.
-- Preview the selected source.
-- Set start and end times in seconds.
-- Export an MP4 clip into `Movies/PeakCut` using Android MediaExtractor and MediaMuxer.
+The Whisper model is downloaded on demand (roughly 100 MB of model data) and is not bundled into the APK.
 
 ## Build
 
 Open this `android/` folder in Android Studio, or run `gradle :app:assembleDebug` with JDK 17 and Android SDK 35 installed.
 
-The debug APK output is `app/build/outputs/apk/debug/app-debug.apk`.
+The debug APK is generated at `app/build/outputs/apk/debug/app-debug.apk`. GitHub Actions builds it on pushes to `android-apk` and uploads an artifact.
 
-A GitHub Actions workflow builds the debug APK on pushes to this branch and uploads it as an artifact.
+## Remaining integration
 
-## Not yet implemented
-
-This is not full PeakCut feature parity. Speech recognition/captions, AI highlight detection, live stream ingestion, creator accounts, and social publishing still need Android-native implementations and device testing. The current clipper is an initial proof-of-concept and must be validated against different codecs, rotation metadata, audio/video sync, and long files before release.
+The current screen does not yet expose transcription. The next step is Android MediaCodec audio extraction/resampling into mono 16 kHz Float32, then wiring Whisper output into caption editing and video rendering. AI highlight selection, live stream capture, creator workspaces and social posting still need to be ported from the Python server and tested on a physical Android device. This is an early native port, not full PeakCut feature parity.
