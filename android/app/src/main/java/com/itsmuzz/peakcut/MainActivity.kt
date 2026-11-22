@@ -83,6 +83,31 @@ class MainActivity : ComponentActivity() {
             text = "Export clip"
             setOnClickListener { exportClip() }
         }, matchWidth())
+        val modelReady = WhisperAsr.modelReady(this)
+        val modelButton = Button(this).apply {
+            text = if (modelReady) "Hindi AI model ready" else "Download Hindi AI model (~100 MB)"
+            isEnabled = !modelReady
+            setOnClickListener {
+                isEnabled = false
+                executor.execute {
+                    try {
+                        WhisperAsr.downloadModel(this@MainActivity) { percent ->
+                            runOnUiThread { status.text = "Downloading Hindi AI model: $percent%" }
+                        }
+                        runOnUiThread {
+                            text = "Hindi AI model ready"
+                            status.text = "Model downloaded. Next: connect video audio to Hindi transcription."
+                        }
+                    } catch (e: Exception) {
+                        runOnUiThread {
+                            isEnabled = true
+                            status.text = "Model download failed: ${e.message ?: "unknown error"}"
+                        }
+                    }
+                }
+            }
+        }
+        root.addView(modelButton, matchWidth())
         status = label("Select a video to create your first clip.").apply {
             setPadding(0, 18, 0, 0)
             setTextColor(android.graphics.Color.rgb(160, 180, 205))
