@@ -129,36 +129,37 @@ object WhisperAsr {
         check(modelReady(context)) { "Speech model is not downloaded yet" }
 
         val dir = File(context.filesDir, "models/$MODEL_DIR")
-        val whisper = OfflineWhisperModelConfig.builder()
-            .setEncoder(File(dir, requiredFiles[0]).absolutePath)
-            .setDecoder(File(dir, requiredFiles[1]).absolutePath)
-            .setLanguage(language)
-            .setTask("transcribe")
-            .setEnableTokenTimestamps(true)
-            .build()
-        val model = OfflineModelConfig.builder()
-            .setWhisper(whisper)
-            .setTokens(File(dir, requiredFiles[2]).absolutePath)
-            .setNumThreads(threads.coerceIn(1, 4))
-            .setDebug(false)
-            .build()
+        val whisper = OfflineWhisperModelConfig(
+            encoder = File(dir, requiredFiles[0]).absolutePath,
+            decoder = File(dir, requiredFiles[1]).absolutePath,
+            language = language,
+            task = "transcribe",
+            enableTokenTimestamps = true,
+        )
+        val model = OfflineModelConfig(
+            whisper = whisper,
+            tokens = File(dir, requiredFiles[2]).absolutePath,
+            numThreads = threads.coerceIn(1, 4),
+            debug = false,
+            provider = "cpu",
+        )
         val recognizer = OfflineRecognizer(
-            OfflineRecognizerConfig.builder()
-                .setOfflineModelConfig(model)
-                .setDecodingMethod("greedy_search")
-                .build()
+            config = OfflineRecognizerConfig(
+                modelConfig = model,
+                decodingMethod = "greedy_search",
+            )
         )
         val stream = recognizer.createStream()
         try {
             stream.acceptWaveform(samples16kMono, 16000)
             recognizer.decode(stream)
             val result = recognizer.getResult(stream)
-            val tokens = result.tokens ?: emptyArray()
-            val times = result.timestamps ?: floatArrayOf()
+            val tokens = result.tokens
+            val times = result.timestamps
             val aligned = tokens.mapIndexed { index, token ->
                 TranscriptToken(token, times.getOrNull(index) ?: 0f)
             }
-            return result.text.orEmpty() to aligned
+            return result.text to aligned
         } finally {
             stream.release()
             recognizer.release()
