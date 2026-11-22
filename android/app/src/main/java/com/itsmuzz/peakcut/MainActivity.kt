@@ -38,10 +38,10 @@ class MainActivity : ComponentActivity() {
         bar.addView(settings, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
         bar.addView(reload)
         web = WebView(this).apply {
-            settings.javaScriptEnabled = true
-            settings.domStorageEnabled = true
-            settings.allowFileAccess = true
-            settings.mediaPlaybackRequiresUserGesture = false
+            this.settings.javaScriptEnabled = true
+            this.settings.domStorageEnabled = true
+            this.settings.allowFileAccess = true
+            this.settings.mediaPlaybackRequiresUserGesture = false
             webChromeClient = WebChromeClient()
             webViewClient = object : WebViewClient() {
                 override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
