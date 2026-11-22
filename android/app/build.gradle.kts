@@ -26,6 +26,6 @@ android {
 
 dependencies {
     implementation("androidx.activity:activity-ktx:1.9.3")
-    implementation("com.github.k2-fsa.sherpa-onnx:sherpa-onnx:v2.0.3")
+    implementation("com.github.k2-fsa.sherpa-onnx:sherpa-onnx:v2.0.1")
     implementation("org.apache.commons:commons-compress:1.27.1")
 }
