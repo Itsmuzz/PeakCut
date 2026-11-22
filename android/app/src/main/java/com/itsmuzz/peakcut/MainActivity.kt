@@ -1,6 +1,6 @@
 package com.itsmuzz.peakcut
 
-import android.app.Activity
+import androidx.activity.ComponentActivity
 import android.content.ContentValues
 import android.content.Intent
 import android.media.MediaExtractor
@@ -20,7 +20,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import java.nio.ByteBuffer
 import java.util.concurrent.Executors
 
-class MainActivity : Activity() {
+class MainActivity : ComponentActivity() {
     private val executor = Executors.newSingleThreadExecutor()
     private var selectedVideo: Uri? = null
     private lateinit var preview: VideoView
