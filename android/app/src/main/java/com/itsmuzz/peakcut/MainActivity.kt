@@ -137,20 +137,27 @@ class MainActivity : ComponentActivity() {
                     require(trackMap.isNotEmpty()) { "No audio/video tracks found" }
                     muxer.start()
                     extractor.seekTo(startUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
-                    val buffer = ByteBuffer.allocate(4 * 1024 * 1024)
+                    val firstSampleTimeUs = extractor.sampleTime
+                    require(firstSampleTimeUs >= 0) { "Start time is beyond the readable video range" }
+                    val buffer = ByteBuffer.allocate(8 * 1024 * 1024)
                     val info = MediaCodec.BufferInfo()
+                    var writtenSamples = 0
                     while (true) {
                         val track = extractor.sampleTrackIndex
-                        if (track < 0 || extractor.sampleTime > endUs) break
+                        val sampleTimeUs = extractor.sampleTime
+                        if (track < 0 || sampleTimeUs < 0 || sampleTimeUs > endUs) break
                         if (trackMap.containsKey(track)) {
                             buffer.clear()
                             val size = extractor.readSampleData(buffer, 0)
                             if (size < 0) break
-                            info.set(0, size, extractor.sampleTime, extractor.sampleFlags)
+                            val outputTimeUs = (sampleTimeUs - firstSampleTimeUs).coerceAtLeast(0L)
+                            info.set(0, size, outputTimeUs, extractor.sampleFlags)
                             muxer.writeSampleData(trackMap[track]!!, buffer, info)
+                            writtenSamples++
                         }
                         if (!extractor.advance()) break
                     }
+                    require(writtenSamples > 0) { "No media samples found in the selected time range" }
                     muxer.stop()
                     muxer.release()
                     extractor.release()
