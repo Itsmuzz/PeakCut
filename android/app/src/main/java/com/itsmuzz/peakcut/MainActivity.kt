@@ -1,202 +1,98 @@
 package com.itsmuzz.peakcut
 
-import androidx.activity.ComponentActivity
-import android.content.ContentValues
-import android.content.Intent
-import android.media.MediaCodec
-import android.media.MediaExtractor
-import android.media.MediaFormat
-import android.media.MediaMuxer
-import android.net.Uri
+import android.annotation.SuppressLint
+import android.app.AlertDialog
 import android.os.Bundle
-import android.provider.MediaStore
-import android.view.Gravity
 import android.view.ViewGroup
-import android.widget.Button
-import android.widget.EditText
-import android.widget.LinearLayout
-import android.widget.TextView
-import android.widget.VideoView
-import androidx.activity.result.contract.ActivityResultContracts
-import java.nio.ByteBuffer
-import java.util.concurrent.Executors
+import android.webkit.*
+import android.widget.*
+import androidx.activity.ComponentActivity
 
 class MainActivity : ComponentActivity() {
-    private val executor = Executors.newSingleThreadExecutor()
-    private var selectedVideo: Uri? = null
-    private lateinit var preview: VideoView
-    private lateinit var status: TextView
-    private lateinit var startSeconds: EditText
-    private lateinit var endSeconds: EditText
+    private lateinit var web: WebView
+    private val prefs by lazy { getSharedPreferences("peakcut", MODE_PRIVATE) }
+    private val defaultUrl = "http://127.0.0.1:8765/app"
 
-    private val pickVideo = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-        if (uri != null) {
-            selectedVideo = uri
-            try { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: Exception) { }
-            preview.setVideoURI(uri)
-            preview.start()
-            status.text = "Video ready. Start/end time seconds mein set karo."
-        }
-    }
-
+    @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        window.statusBarColor = android.graphics.Color.rgb(9, 12, 20)
-        window.navigationBarColor = android.graphics.Color.rgb(9, 12, 20)
+        window.statusBarColor = android.graphics.Color.rgb(30, 22, 18)
+        window.navigationBarColor = android.graphics.Color.rgb(30, 22, 18)
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(22, 34, 22, 24)
-            setBackgroundColor(android.graphics.Color.rgb(9, 12, 20))
+            setBackgroundColor(android.graphics.Color.rgb(30,22,18))
         }
-        fun label(text: String, size: Float = 15f) = TextView(this).apply {
-            this.text = text
-            textSize = size
-            setTextColor(android.graphics.Color.WHITE)
+        val bar = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(10, 8, 10, 8)
+            gravity = android.view.Gravity.CENTER_VERTICAL
         }
-        root.addView(label("PEAKCUT", 28f).apply { letterSpacing = 0.18f })
-        root.addView(label("VIDEO STUDIO  •  ANDROID", 11f).apply {
-            setTextColor(android.graphics.Color.rgb(130, 155, 190))
-            setPadding(0, 4, 0, 22)
-        })
-        preview = VideoView(this)
-        root.addView(preview, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 220).apply { bottomMargin = 18 })
-        root.addView(Button(this).apply {
-            text = "Choose video"
-            setOnClickListener { pickVideo.launch(arrayOf("video/*")) }
-        }, matchWidth())
-        val fields = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
-        startSeconds = EditText(this).apply {
-            hint = "Start (sec)"
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
-            setText("0"); setTextColor(android.graphics.Color.WHITE); setHintTextColor(android.graphics.Color.GRAY)
+        val settings = Button(this).apply {
+            text = "Server"
+            setOnClickListener { editServer() }
         }
-        endSeconds = EditText(this).apply {
-            hint = "End (sec)"
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
-            setText("30"); setTextColor(android.graphics.Color.WHITE); setHintTextColor(android.graphics.Color.GRAY)
+        val reload = Button(this).apply {
+            text = "Reload"
+            setOnClickListener { web.reload() }
         }
-        fields.addView(startSeconds, LinearLayout.LayoutParams(0, 58, 1f).apply { rightMargin = 8 })
-        fields.addView(endSeconds, LinearLayout.LayoutParams(0, 58, 1f).apply { leftMargin = 8 })
-        root.addView(fields)
-        root.addView(Button(this).apply {
-            text = "Export clip"
-            setOnClickListener { exportClip() }
-        }, matchWidth())
-        val modelReady = WhisperAsr.modelReady(this)
-        val modelButton = Button(this).apply {
-            text = if (modelReady) "Hindi AI model ready" else "Download Hindi AI model (~100 MB)"
-            isEnabled = !modelReady
-            setOnClickListener {
-                isEnabled = false
-                executor.execute {
-                    try {
-                        WhisperAsr.downloadModel(this@MainActivity) { percent ->
-                            runOnUiThread { status.text = "Downloading Hindi AI model: $percent%" }
-                        }
-                        runOnUiThread {
-                            text = "Hindi AI model ready"
-                            status.text = "Model downloaded. Next: connect video audio to Hindi transcription."
-                        }
-                    } catch (e: Exception) {
-                        runOnUiThread {
-                            isEnabled = true
-                            status.text = "Model download failed: ${e.message ?: "unknown error"}"
-                        }
-                    }
+        bar.addView(settings, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        bar.addView(reload)
+        web = WebView(this).apply {
+            settings.javaScriptEnabled = true
+            settings.domStorageEnabled = true
+            settings.allowFileAccess = true
+            settings.mediaPlaybackRequiresUserGesture = false
+            webChromeClient = WebChromeClient()
+            webViewClient = object : WebViewClient() {
+                override fun onReceivedError(view: WebView?, request: WebResourceRequest?, error: WebResourceError?) {
+                    if (request?.isForMainFrame == true) showOffline()
                 }
             }
         }
-        root.addView(modelButton, matchWidth())
-        status = label("Select a video to create your first clip.").apply {
-            setPadding(0, 18, 0, 0)
-            setTextColor(android.graphics.Color.rgb(160, 180, 205))
-        }
-        root.addView(status, matchWidth())
-        root.addView(label("Milestone 1 • Local video trimming", 11f).apply {
-            setTextColor(android.graphics.Color.rgb(100, 120, 145)); setPadding(0, 26, 0, 0)
-        })
+        root.addView(bar)
+        root.addView(web, LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f))
         setContentView(root)
+        web.loadUrl(prefs.getString("url", defaultUrl) ?: defaultUrl)
     }
 
-    private fun matchWidth() = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply { bottomMargin = 12 }
-
-    private fun exportClip() {
-        val source = selectedVideo ?: run { status.text = "Pehle video select karo."; return }
-        val startUs = ((startSeconds.text.toString().toDoubleOrNull() ?: 0.0).coerceAtLeast(0.0) * 1_000_000).toLong()
-        val endUs = ((endSeconds.text.toString().toDoubleOrNull() ?: 0.0) * 1_000_000).toLong()
-        if (endUs <= startUs) { status.text = "End time, start time se bada hona chahiye."; return }
-        status.text = "Clip export ho raha hai…"
-        executor.execute {
-            try {
-                val result = trimVideo(source, startUs, endUs)
-                runOnUiThread { status.text = "Saved to Movies/PeakCut: $result" }
-            } catch (e: Exception) {
-                runOnUiThread { status.text = "Export failed: ${e.message ?: "unknown error"}" }
-            }
-        }
+    private fun showOffline() {
+        val html = """
+            <html><meta name="viewport" content="width=device-width,initial-scale=1">
+            <body style="font-family:sans-serif;background:#1e1612;color:#f4eeea;padding:28px">
+            <h2>PeakCut server not reachable</h2>
+            <p>This Android app opens your original PeakCut dashboard. The PeakCut Python backend must be running at the configured server address.</p>
+            <p>Tap <b>Server</b> above to change the address, then tap Reload.</p>
+            </body></html>
+        """.trimIndent()
+        runOnUiThread { web.loadDataWithBaseURL(null, html, "text/html", "UTF-8", null) }
     }
 
-    private fun trimVideo(source: Uri, startUs: Long, endUs: Long): String {
-        val values = ContentValues().apply {
-            put(MediaStore.Video.Media.DISPLAY_NAME, "PeakCut_${System.currentTimeMillis()}.mp4")
-            put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
-            put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/PeakCut")
+    private fun editServer() {
+        val input = EditText(this).apply {
+            setSingleLine(true)
+            setText(prefs.getString("url", defaultUrl))
+            hint = "http://192.168.1.10:8765/app"
         }
-        val outputUri = contentResolver.insert(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, values) ?: error("Could not create output video")
-        try {
-            contentResolver.openFileDescriptor(outputUri, "w")!!.use { output ->
-                contentResolver.openFileDescriptor(source, "r")!!.use { input ->
-                    val extractor = MediaExtractor()
-                    extractor.setDataSource(input.fileDescriptor)
-                    val muxer = MediaMuxer(output.fileDescriptor, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
-                    val trackMap = HashMap<Int, Int>()
-                    for (i in 0 until extractor.trackCount) {
-                        val format = extractor.getTrackFormat(i)
-                        val mime = format.getString(MediaFormat.KEY_MIME) ?: continue
-                        if (mime.startsWith("video/") || mime.startsWith("audio/")) {
-                            extractor.selectTrack(i)
-                            trackMap[i] = muxer.addTrack(format)
-                        }
-                    }
-                    require(trackMap.isNotEmpty()) { "No audio/video tracks found" }
-                    muxer.start()
-                    extractor.seekTo(startUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
-                    val firstSampleTimeUs = extractor.sampleTime
-                    require(firstSampleTimeUs >= 0) { "Start time is beyond the readable video range" }
-                    val buffer = ByteBuffer.allocate(8 * 1024 * 1024)
-                    val info = MediaCodec.BufferInfo()
-                    var writtenSamples = 0
-                    while (true) {
-                        val track = extractor.sampleTrackIndex
-                        val sampleTimeUs = extractor.sampleTime
-                        if (track < 0 || sampleTimeUs < 0 || sampleTimeUs > endUs) break
-                        if (trackMap.containsKey(track)) {
-                            buffer.clear()
-                            val size = extractor.readSampleData(buffer, 0)
-                            if (size < 0) break
-                            val outputTimeUs = (sampleTimeUs - firstSampleTimeUs).coerceAtLeast(0L)
-                            info.set(0, size, outputTimeUs, extractor.sampleFlags)
-                            muxer.writeSampleData(trackMap[track]!!, buffer, info)
-                            writtenSamples++
-                        }
-                        if (!extractor.advance()) break
-                    }
-                    require(writtenSamples > 0) { "No media samples found in the selected time range" }
-                    muxer.stop()
-                    muxer.release()
-                    extractor.release()
-                }
-            }
-            return outputUri.lastPathSegment ?: "clip exported"
-        } catch (e: Exception) {
-            contentResolver.delete(outputUri, null, null)
-            throw e
-        }
+        AlertDialog.Builder(this)
+            .setTitle("PeakCut server address")
+            .setMessage("Enter the address where your PeakCut backend is running.")
+            .setView(input)
+            .setNegativeButton("Cancel", null)
+            .setPositiveButton("Save") { _, _ ->
+                val value = input.text.toString().trim()
+                if (value.startsWith("http://") || value.startsWith("https://")) {
+                    prefs.edit().putString("url", value).apply()
+                    web.loadUrl(value)
+                } else Toast.makeText(this, "Enter a valid http:// or https:// address", Toast.LENGTH_LONG).show()
+            }.show()
+    }
+
+    override fun onBackPressed() {
+        if (::web.isInitialized && web.canGoBack()) web.goBack() else super.onBackPressed()
     }
 
     override fun onDestroy() {
-        executor.shutdown()
+        if (::web.isInitialized) web.destroy()
         super.onDestroy()
     }
 }
