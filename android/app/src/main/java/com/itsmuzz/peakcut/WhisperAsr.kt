@@ -88,7 +88,14 @@ object WhisperAsr {
                             val name = entry.name.substringAfterLast('/')
                             if (name !in requiredFiles) continue
                             FileOutputStream(File(staging, name)).use { output ->
-                                tar.copyTo(output)
+                                var remaining = entry.size
+                                val buffer = ByteArray(64 * 1024)
+                                while (remaining > 0) {
+                                    val count = tar.read(buffer, 0, minOf(buffer.size.toLong(), remaining).toInt())
+                                    check(count > 0) { "Unexpected end of model archive while extracting $name" }
+                                    output.write(buffer, 0, count)
+                                    remaining -= count
+                                }
                             }
                         }
                     }
