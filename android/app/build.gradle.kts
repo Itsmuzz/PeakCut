@@ -1,3 +1,6 @@
+import java.io.File
+import java.net.URL
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -11,7 +14,7 @@ val downloadSherpaAar by tasks.registering {
         if (!target.isFile || target.length() < 10_000_000L) {
             target.parentFile.mkdirs()
             val partial = File(target.parentFile, target.name + ".part")
-            val connection = java.net.URL(
+            val connection = URL(
                 "https://github.com/k2-fsa/sherpa-onnx/releases/download/v2.0.1/sherpa-onnx-2.0.1.aar"
             ).openConnection().apply {
                 connectTimeout = 20000
