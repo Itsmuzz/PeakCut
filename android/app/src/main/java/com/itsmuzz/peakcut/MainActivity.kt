@@ -3,6 +3,7 @@ package com.itsmuzz.peakcut
 import androidx.activity.ComponentActivity
 import android.content.ContentValues
 import android.content.Intent
+import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMuxer
@@ -137,7 +138,7 @@ class MainActivity : ComponentActivity() {
                     muxer.start()
                     extractor.seekTo(startUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
                     val buffer = ByteBuffer.allocate(4 * 1024 * 1024)
-                    val info = MediaMuxer.BufferInfo()
+                    val info = MediaCodec.BufferInfo()
                     while (true) {
                         val track = extractor.sampleTrackIndex
                         if (track < 0 || extractor.sampleTime > endUs) break
